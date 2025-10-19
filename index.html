@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sachbot: Digital Truth Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        #app-container {
+            max-width: 420px; /* Simulating a mobile phone width */
+            min-height: 100vh;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+        .nav-icon {
+            /* Styles for interactive nav buttons */
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-icon.active {
+            color: #1e40af; /* Darker blue for active state */
+            transform: scale(1.05);
+        }
+        .status-pill {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-false { background-color: #fecaca; color: #dc2626; } /* Light Red/Dark Red */
+        .status-misleading { background-color: #fde68a; color: #d97706; } /* Light Yellow/Dark Yellow */
+        .status-verified { background-color: #d1fae5; color: #059669; } /* Light Green/Dark Green */
+        .trend-critical { background-color: #fee2e2; color: #b91c1c; }
+        .trend-high-risk { background-color: #fef3c7; color: #d97706; }
+        .trend-under-review { background-color: #e0f2f1; color: #0d9488; }
+        .info-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+        .info-card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+    <!-- Lucide Icons for simplicity -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div id="app-container" class="rounded-xl overflow-hidden">
+        <!-- Header -->
+        <header class="p-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+            <div class="flex items-center space-x-2">
+                <!-- Simple Logo Representation (Sachbot S with a Check) -->
+                <div class="text-xl font-bold text-white bg-blue-600 rounded-full w-8 h-8 flex items-center justify-center shadow-md">S</div>
+                <h1 class="text-xl font-bold text-gray-800">Sachbot</h1>
+            </div>
+            <div class="text-gray-500 hover:text-blue-600 cursor-pointer">
+                <i data-lucide="bell" class="w-6 h-6"></i>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="content" class="flex-grow p-4 overflow-y-auto pb-20"></main>
+
+        <!-- Navigation Bar -->
+        <nav class="sticky bottom-0 bg-white border-t border-gray-100 p-3 flex justify-around shadow-lg z-10">
+            <div class="nav-icon flex flex-col items-center text-gray-400" onclick="App.navigateTo('dashboard')" id="nav-dashboard">
+                <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                <span class="text-xs mt-1">Dashboard</span>
+            </div>
+            <div class="nav-icon flex flex-col items-center text-gray-400" onclick="App.navigateTo('alerts')" id="nav-alerts">
+                <i data-lucide="mail-check" class="w-6 h-6"></i>
+                <span class="text-xs mt-1">Alerts</span>
+            </div>
+            <div class="nav-icon flex flex-col items-center text-gray-400" onclick="App.navigateTo('sources')" id="nav-sources">
+                <i data-lucide="settings" class="w-6 h-6"></i>
+                <span class="text-xs mt-1">Engine</span>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // --- Mock Data ---
+        const mockAlerts = [
+            { id: 1, title: "FALSE: COVID-19 cure found in citrus fruit.", status: 'False', category: 'Health Crisis', source: 'WHO', date: '5 min ago', explanation: "The World Health Organization (WHO) confirms there is currently no cure for the specific variant. This claim is based on misinterpreted data about Vitamin C." },
+            { id: 2, title: "Misleading: Localized flood warning issued for all districts.", status: 'Misleading', category: 'Natural Disaster', source: 'PIB India', date: '30 min ago', explanation: "The official report from PIB only confirms heavy rainfall for the Southern district. The generalized alert for 'all districts' is inaccurate and causing unnecessary panic." },
+            { id: 3, title: "Verified: Government relief fund deadline extended.", status: 'Verified', category: 'World News', source: 'Reuters', date: '1 hr ago', explanation: "Reuters verified the official extension through a direct statement from the Ministry of Finance." }
+        ];
+
+        const mockTrending = [
+            { topic: "Climate Summit 2025", count: "1.2M", status: "Critical" },
+            { topic: "Festival of Lights Date Change", count: "890K", status: "Under Review" },
+            { topic: "Conflict Zone Ceasefire Rumor", count: "450K", status: "High Risk" }
+        ];
+
+        // --- Utility Functions ---
+
+        /**
+         * Renders the Dashboard View HTML.
+         */
+        const DashboardView = () => {
+            const totalAlerts = mockAlerts.length;
+            const falseCount = mockAlerts.filter(a => a.status === 'False').length;
+            const misleadingCount = mockAlerts.filter(a => a.status === 'Misleading').length;
+
+            const trendingList = mockTrending.map(item => `
+                <div class="flex justify-between items-center py-3 border-b border-gray-100">
+                    <div>
+                        <p class="text-sm font-medium text-gray-800">${item.topic}</p>
+                        <p class="text-xs text-gray-500">${item.count} posts analyzed</p>
+                    </div>
+                    <span class="status-pill ${item.status === 'Critical' ? 'trend-critical' : (item.status === 'High Risk' ? 'trend-high-risk' : 'trend-under-review')}">
+                        ${item.status}
+                    </span>
+                </div>
+            `).join('');
+
+            return `
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Overview</h2>
+
+                <!-- Verification Stats -->
+                <div class="grid grid-cols-3 gap-3 mb-6">
+                    <div class="info-card bg-blue-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-extrabold text-blue-600">${totalAlerts}</p>
+                        <p class="text-xs text-blue-500 mt-1">Total Verified</p>
+                    </div>
+                    <div class="info-card bg-red-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-extrabold text-red-600">${falseCount}</p>
+                        <p class="text-xs text-red-500 mt-1">False Alerts</p>
+                    </div>
+                    <div class="info-card bg-yellow-50 p-4 rounded-lg text-center">
+                        <p class="text-2xl font-extrabold text-yellow-600">${misleadingCount}</p>
+                        <p class="text-xs text-yellow-500 mt-1">Misleading</p>
+                    </div>
+                </div>
+
+                <!-- Trending Misinformation -->
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="trending-up" class="w-5 h-5 mr-2 text-blue-600"></i>
+                    Trending Topics Risk
+                </h3>
+                <div class="bg-white rounded-xl p-4 shadow-md">
+                    ${trendingList}
+                    <div class="text-center text-xs text-gray-500 pt-4">Data updated in real-time.</div>
+                </div>
+
+                <div class="mt-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-lg">
+                    <p class="text-sm font-semibold text-green-700">Proactive Defense</p>
+                    <p class="text-xs text-green-600 mt-1">Sachbot detects suspicious trends before they go viral.</p>
+                </div>
+            `;
+        };
+
+        /**
+         * Renders the Alerts View HTML.
+         */
+        const AlertsView = () => {
+            const alertsList = mockAlerts.map(alert => {
+                const statusClass = alert.status === 'False' ? 'status-false' : (alert.status === 'Misleading' ? 'status-misleading' : 'status-verified');
+                const icon = alert.status === 'False' ? 'x-circle' : (alert.status === 'Misleading' ? 'alert-triangle' : 'check-circle');
+
+                return `
+                    <div class="info-card bg-white p-4 rounded-xl shadow-sm mb-4 border border-gray-100">
+                        <div class="flex items-start justify-between mb-2">
+                            <span class="status-pill ${statusClass}">${alert.status}</span>
+                            <span class="text-xs text-gray-400">${alert.date}</span>
+                        </div>
+                        <h4 class="text-base font-semibold text-gray-800 mb-2">${alert.title}</h4>
+                        
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <p class="text-sm font-medium text-gray-700 flex items-center">
+                                <i data-lucide="check-shield" class="w-4 h-4 mr-2 text-green-600"></i>
+                                Sachbot's Explanation
+                            </p>
+                            <p class="text-xs text-gray-600 mt-1">${alert.explanation}</p>
+                            <p class="text-xs text-blue-500 mt-2">Verified against: ${alert.source}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Misinformation Alerts</h2>
+                <p class="text-gray-500 mb-4">You have received ${mockAlerts.length} recent verification reports.</p>
+                ${alertsList}
+                <div class="text-center text-sm text-gray-500 py-4">End of recent alerts.</div>
+            `;
+        };
+
+        /**
+         * Renders the Sources/Engine Status View HTML.
+         */
+        const SourcesView = () => {
+            const trustedSources = [
+                { name: "World Health Organization (WHO)", status: "Active", icon: "clipboard-check" },
+                { name: "Reuters / BBC", status: "Active", icon: "newspaper" },
+                { name: "PIB India (Official Reports)", status: "Active", icon: "badge-check" },
+                { name: "Google Fact Check Tools API", status: "Active", icon: "search-check" },
+                { name: "Sentiment Analysis Engine", status: "Active", icon: "brain" },
+                { name: "RoBERTa Claim Model", status: "Active", icon: "code" }
+            ];
+
+            const sourceList = trustedSources.map(source => `
+                <div class="flex items-center justify-between p-3 border-b last:border-b-0 border-gray-100">
+                    <div class="flex items-center">
+                        <i data-lucide="${source.icon}" class="w-5 h-5 mr-3 text-blue-500"></i>
+                        <span class="text-sm text-gray-700">${source.name}</span>
+                    </div>
+                    <span class="text-xs font-medium text-green-600 flex items-center">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                        ${source.status}
+                    </span>
+                </div>
+            `).join('');
+
+            return `
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">AI Engine Status</h2>
+                <div class="bg-blue-600 text-white p-4 rounded-xl mb-6 shadow-md">
+                    <p class="text-sm font-semibold flex items-center">
+                        <i data-lucide="cpu" class="w-5 h-5 mr-2"></i>
+                        Verification Pipeline
+                    </p>
+                    <h3 class="text-xl font-extrabold mt-1">Operational & Proactive</h3>
+                    <p class="text-xs opacity-80 mt-2">AI models (BERT/RoBERTa) are constantly scanning and cross-verifying claims.</p>
+                </div>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Trusted Verification Sources</h3>
+                <div class="bg-white rounded-xl shadow-md border border-gray-100 p-2">
+                    ${sourceList}
+                </div>
+            `;
+        };
+
+
+        // --- Application Logic ---
+        const App = {
+            currentPage: 'dashboard',
+            contentElement: document.getElementById('content'),
+            navigationElements: {
+                dashboard: document.getElementById('nav-dashboard'),
+                alerts: document.getElementById('nav-alerts'),
+                sources: document.getElementById('nav-sources')
+            },
+
+            renderView: function() {
+                this.contentElement.innerHTML = '';
+                let viewContent = '';
+                let newTitle = '';
+
+                switch (this.currentPage) {
+                    case 'dashboard':
+                        viewContent = DashboardView();
+                        newTitle = 'Dashboard';
+                        break;
+                    case 'alerts':
+                        viewContent = AlertsView();
+                        newTitle = 'Alerts';
+                        break;
+                    case 'sources':
+                        viewContent = SourcesView();
+                        newTitle = 'Engine Status';
+                        break;
+                    default:
+                        viewContent = 'Page not found.';
+                }
+
+                // Update content and re-render icons
+                this.contentElement.innerHTML = viewContent;
+                lucide.createIcons();
+                this.updateNavigation();
+            },
+
+            updateNavigation: function() {
+                // Remove active class from all
+                Object.values(this.navigationElements).forEach(el => {
+                    el.classList.remove('active', 'text-blue-600');
+                    el.classList.add('text-gray-400');
+                });
+
+                // Add active class to current page
+                const activeEl = this.navigationElements[this.currentPage];
+                if (activeEl) {
+                    activeEl.classList.add('active', 'text-blue-600');
+                    activeEl.classList.remove('text-gray-400');
+                }
+            },
+
+            navigateTo: function(page) {
+                this.currentPage = page;
+                this.renderView();
+            },
+
+            init: function() {
+                this.renderView();
+            }
+        };
+
+        // Initialize the app when the window loads
+        window.onload = function() {
+            App.init();
+        };
+    </script>
+</body>
+</html>
